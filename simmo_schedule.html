@@ -91,11 +91,36 @@ td.disabled-session{background:#f3f4f6;color:#bbb;font-size:12px;font-style:ital
 .del-btn{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:13px;padding:3px 5px;border-radius:4px;}
 .del-btn:hover{color:var(--red);}
 
+.lockscreen{
+  position:fixed;inset:0;background:var(--teal);z-index:1000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+}
+.lockscreen-logo{color:#fff;font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.lockscreen-sub{color:rgba(255,255,255,.7);font-size:13px;margin-bottom:24px;}
+.lockscreen-box{
+  background:#fff;border-radius:20px;padding:36px 40px;
+  width:320px;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;
+}
+.lockscreen-box h2{font-size:16px;font-weight:800;margin-bottom:6px;color:var(--txt);}
+.lockscreen-box p{font-size:12px;color:var(--txt-sub);margin-bottom:20px;}
+.pin-input{
+  width:100%;border:2px solid var(--border);border-radius:10px;
+  padding:12px;font-size:32px;text-align:center;letter-spacing:16px;
+  font-family:inherit;outline:none;background:#f9fafb;
+  transition:border-color .15s;margin-bottom:14px;
+}
+.pin-input:focus{border-color:var(--teal);background:#fff;}
+.pin-err{color:var(--red);font-size:12px;font-weight:600;margin-bottom:10px;display:none;background:#fef2f2;padding:8px 12px;border-radius:6px;}
+.pin-btn{
+  width:100%;background:var(--teal);color:#fff;border:none;
+  border-radius:10px;padding:13px;font-size:15px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:background .15s;
+}
+.pin-btn:hover{background:var(--teal-dark);}
+
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;color:var(--txt-sub);text-align:center;}
 .empty-icon{font-size:52px;margin-bottom:16px;opacity:.5;}
 .empty h3{font-size:17px;font-weight:700;margin-bottom:8px;color:var(--txt);}
-
-/* MODALS */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:500;}
 .modal{background:#fff;border-radius:16px;padding:32px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2);}
 .modal h2{font-size:17px;font-weight:800;margin-bottom:6px;}
@@ -112,6 +137,23 @@ td.disabled-session{background:#f3f4f6;color:#bbb;font-size:12px;font-style:ital
 </head>
 <body>
 
+<!-- 잠금 화면 -->
+<div class="lockscreen" id="lockscreen">
+  <div class="lockscreen-logo">📋 실모 컨텐츠 통합 일정</div>
+  <div class="lockscreen-sub">강남대성기숙 QUETTA</div>
+  <div class="lockscreen-box">
+    <h2>🔐 PIN 입력</h2>
+    <p>관리자 PIN 번호를 입력하세요</p>
+    <input class="pin-input" type="password" id="pinInput"
+      maxlength="4" inputmode="numeric" pattern="[0-9]*"
+      placeholder="••••"
+      onkeydown="if(event.key==='Enter')submitPin()"
+      oninput="if(this.value.length===4)submitPin()">
+    <div class="pin-err" id="pinErr">PIN 번호가 올바르지 않습니다.</div>
+    <button class="pin-btn" onclick="submitPin()">입력</button>
+  </div>
+</div>
+
 <header class="hdr">
   <div>
     <div class="hdr-title">📋 실모 컨텐츠 통합 일정</div>
@@ -119,9 +161,9 @@ td.disabled-session{background:#f3f4f6;color:#bbb;font-size:12px;font-style:ital
   </div>
   <div class="hdr-right">
     <span class="save-chip" id="saveChip">✓ 저장됨</span>
-    <button class="admin-btn" id="adminBtn" onclick="toggleAdmin()">
-      <span id="adminIcon">🔒</span>
-      <span id="adminLabel">관리자 로그인</span>
+    <button class="admin-btn" id="adminBtn" onclick="lockApp()">
+      <span id="adminIcon">🔓</span>
+      <span id="adminLabel">잠금</span>
     </button>
   </div>
 </header>
@@ -135,24 +177,6 @@ td.disabled-session{background:#f3f4f6;color:#bbb;font-size:12px;font-style:ital
     <p>좌측 사이드바에서 확인할 컨텐츠를 선택해주세요.</p>
   </div>
 </main>
-
-<!-- PIN 로그인 모달 -->
-<div class="overlay" id="loginModal" style="display:none">
-  <div class="modal">
-    <h2>🔐 관리자 로그인</h2>
-    <p>PIN 번호 4자리를 입력하세요.</p>
-    <label>PIN</label>
-    <input type="password" id="loginPin" placeholder="••••" maxlength="4"
-      inputmode="numeric" pattern="[0-9]*"
-      style="font-size:28px;text-align:center;letter-spacing:12px;"
-      onkeydown="if(event.key==='Enter')doLogin()">
-    <div class="err-msg" id="loginErr"></div>
-    <div class="modal-btns">
-      <button class="btn-secondary" onclick="closeLoginModal()">취소</button>
-      <button class="btn-primary" onclick="doLogin()">확인</button>
-    </div>
-  </div>
-</div>
 
 <!-- 회차 추가 (단일) -->
 <div class="overlay" id="addModal" style="display:none">
@@ -618,39 +642,40 @@ function confirmCombRow(){
   fbSave(pid,combData[pid]);renderCombinedTable(_combId);
 }
 
-// ── 관리자 인증 (PIN) ────────────────────────────────────────────
-function toggleAdmin(){
-  if(isAdmin){
-    isAdmin=false;updateAdminUI();rerender();
-  }else{
-    document.getElementById('loginModal').style.display='flex';
-    setTimeout(function(){document.getElementById('loginPin').focus();},80);
-  }
-}
-function closeLoginModal(){
-  document.getElementById('loginModal').style.display='none';
-  document.getElementById('loginErr').style.display='none';
-  document.getElementById('loginPin').value='';
-}
-function doLogin(){
-  var pin=document.getElementById('loginPin').value;
-  var errEl=document.getElementById('loginErr');
+// ── 잠금화면 PIN 인증 ────────────────────────────────────────────
+function submitPin(){
+  var pin=document.getElementById('pinInput').value;
+  var errEl=document.getElementById('pinErr');
   if(pin===ADMIN_PIN){
-    isAdmin=true;updateAdminUI();closeLoginModal();rerender();
-  }else{
-    errEl.textContent='PIN 번호가 올바르지 않습니다.';
+    isAdmin=true;
+    document.getElementById('lockscreen').style.display='none';
+    updateAdminUI();
+    rerender();
+  }else if(pin.length===4){
     errEl.style.display='block';
-    document.getElementById('loginPin').value='';
-    document.getElementById('loginPin').focus();
+    document.getElementById('pinInput').value='';
+    document.getElementById('pinInput').focus();
+    setTimeout(function(){errEl.style.display='none';},2000);
   }
+}
+function lockApp(){
+  isAdmin=false;
+  document.getElementById('lockscreen').style.display='flex';
+  document.getElementById('pinInput').value='';
+  document.getElementById('pinErr').style.display='none';
+  setTimeout(function(){document.getElementById('pinInput').focus();},100);
+  updateAdminUI();
+  rerender();
 }
 function updateAdminUI(){
-  document.getElementById('adminIcon').textContent=isAdmin?'🔓':'🔒';
-  document.getElementById('adminLabel').textContent=isAdmin?'로그아웃':'관리자 로그인';
-  document.getElementById('adminBtn').className='admin-btn'+(isAdmin?' on':'');
+  document.getElementById('adminIcon').textContent='🔓';
+  document.getElementById('adminLabel').textContent='잠금';
+  document.getElementById('adminBtn').className='admin-btn on';
 }
 
+// 초기 렌더
 renderSidebar();
+setTimeout(function(){document.getElementById('pinInput').focus();},100);
 </script>
 </body>
 </html>
